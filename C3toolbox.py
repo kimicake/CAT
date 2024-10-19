@@ -256,7 +256,7 @@ def count_notes(array, start, end, notes, what, instrument):
     #Returns an array with notes as key and note count as value, sorted by value, descending
     
     instrument_name = ''
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     notes_dict = notesname_array[notesname_instruments_array[instrumentname]]
@@ -275,7 +275,7 @@ def count_notes(array, start, end, notes, what, instrument):
             else:
                 array_count[str(array[x][2])]= 1
     
-    array_count = sorted(iter(array_count.items()), key=operator.itemgetter(1), reverse=True)
+    array_count = sorted(iter(list(array_count.items())), key=operator.itemgetter(1), reverse=True)
     return array_count
 
 
@@ -383,7 +383,7 @@ def sections(array_notesevents, what):
 def level(array, instrument):
     #Returns the selected level, instrument is id
     instrument_name = ''
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     notes_dict = notesname_array[notesname_instruments_array[instrumentname]]
@@ -419,7 +419,7 @@ def level(array, instrument):
     return 'x'
 
 def remap_notes(array_chords, array_translation): #Remap all chords in a song to allowed chords
-    array_chords_sorted = sorted(iter(array_chords.items()), key=operator.itemgetter(1), reverse=True)
+    array_chords_sorted = sorted(iter(list(array_chords.items())), key=operator.itemgetter(1), reverse=True)
     array_valid_chords = []
     #We get the most used chords and build an array
     for j in range(0, len(array_translation)):
@@ -485,7 +485,7 @@ def get_trackid(): #Returns the id for the currently selected track
 def get_trackname(): #Returns the name for the currently selected track
     instrument = get_trackid()
     instrumentname = ''
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if instrumentname:
@@ -1081,7 +1081,7 @@ def polish_notes(instrument, grid, tolerance, selected):
     array_notes = array_notesevents[0]
     array_events = array_notesevents[1]
 
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname or "VOCALS" in instrumentname:
@@ -1138,7 +1138,7 @@ def cleanup_notes(instrument, grid, level, selected):
     array_events = array_notesevents[1]
 
     leveltext = level
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname:
@@ -1330,7 +1330,7 @@ def remove_notes_prokeys(what,level,instrument,how,selected):
     sparse_position = 0
     old_note = []
     base_level = "notes_"+level
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname:
@@ -1489,7 +1489,7 @@ def remove_notes_pg(what,level,instrument,how,selected):
     sparse_position = 0
     old_note = []
     base_level = "notes_"+level
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname:
@@ -1629,7 +1629,7 @@ def remove_notes(what,level,instrument,how,same,sparse,bend,selected):
     position = 0
     sparse_position = 0
     old_note = []
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname:
@@ -1818,7 +1818,7 @@ def create_animation_markers(instrument, expression, pause, mute):
     if pause == 0:
         pause = default_pause
 
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname or "VOCALS" in instrumentname:
@@ -1907,7 +1907,7 @@ def fix_sustains(instrument, level, fix, selected):
     instrumentname = ''
     old_note = []
     leveltext = level
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname:
@@ -2002,7 +2002,7 @@ def single_snare(instrument,level, what, selected):
     instrumentname = ''
     old_note = []
     leveltext = level
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes_"+leveltext
@@ -2079,7 +2079,7 @@ def remove_kick(instrument,level, what, selected):
     instrumentname = ''
     old_note = []
     leveltext = level
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes_"+leveltext
@@ -2152,7 +2152,7 @@ def single_pedal(level, how, selected):
     array_notes = [] #The final array going in the array of notes and events
     instrumentname = ''
     leveltext = level
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes_"+leveltext
@@ -2308,7 +2308,7 @@ def flip_discobeat(instrument, level, selected, mute):
     array_notes = [] #The final array going in the array of notes and events
     instrumentname = ''
     leveltext = level
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes_"+leveltext
@@ -2419,7 +2419,7 @@ def unflip_discobeat(instrument, level, how, selected):
     array_notes = [] #The final array going in the array of notes and events
     instrumentname = ''
     leveltext = level
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes_"+leveltext
@@ -2565,7 +2565,7 @@ def simplify_roll(instrument, level, selected):
     array_notes = [] #The final array going in the array of notes and events
     array_validnotes = []
 
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname:
@@ -2983,7 +2983,7 @@ def reduce_singlenotes(instrument, level, selected):
     array_validnotes = [] #The final array going in the array of notes and events
     array_notes = []
     
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname:
@@ -3035,7 +3035,7 @@ def reduce_singlenotes(instrument, level, selected):
             else:
                 array_chords[chord]=1
     unused = 0
-    for chord_type, chordcount in array_chords.items():
+    for chord_type, chordcount in list(array_chords.items()):
         if (chordcount*100)/chord_count <= chord_threshold*100 and chord_type != 'O':
             unused = 1
 
@@ -3051,14 +3051,14 @@ def reduce_singlenotes(instrument, level, selected):
         array_valid_chords = array_conversions[1]
         array_conversions = array_conversions[0]
     elif level == 'e' and len(array_chords) == 1:
-        for note_from, note_to in array_chords.items():
+        for note_from, note_to in list(array_chords.items()):
             array_conversions.append([note_from, easy_singlenotes_array[note_from]])
     elif (level == 'm' and 'O' not in array_chords) or (level == 'e' and 'O' not in array_chords and 'B' not in array_chords):
         #Do nothing
         c3 = 0
     elif (level == 'm' and 'O' in array_chords) or (level == 'e' and ('O'  in array_chords or 'B'  in array_chords)):
         chord_pattern = []
-        for note_from, note_to in array_chords.items():
+        for note_from, note_to in list(array_chords.items()):
             chord_pattern.append(easy_chords_order[note_from])
         chord_pattern.sort()
         chord_text = ''
@@ -3082,7 +3082,7 @@ def reduce_singlenotes(instrument, level, selected):
         
         chordfrom = array_conversions[x][0]
         chordto = array_conversions[x][1]
-        for notenumber, notedata in notes_dict.items():
+        for notenumber, notedata in list(notes_dict.items()):
             if notedata[1] == leveltext and notedata[2] == chordfrom:
                 chordfrom = str(notenumber)
         array_conversions_final[chordfrom] = chordto
@@ -3098,7 +3098,7 @@ def reduce_singlenotes(instrument, level, selected):
             #We take the letter from the translation
             note_letter = array_conversions_final[chord][0]
             #We get the number of the note
-            for notenumber, notedata in notes_dict.items():
+            for notenumber, notedata in list(notes_dict.items()):
                 if notedata[1] == leveltext and notedata[2] == note_letter:
                     note_number = notenumber
             #We go through the notes in the chord and look for the position for the note
@@ -3126,7 +3126,7 @@ def reduce_chords(instrument, level, option, selected):
     array_validnotes = [] #The final array going in the array of notes and events
     array_notes = []
     
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname:
@@ -3239,7 +3239,7 @@ def reduce_chords(instrument, level, option, selected):
                 array_valid_chords = array_conversions[1]
                 array_conversions = array_conversions[0]
 
-            for chord_from, note_to in easy_chords_translation.items():
+            for chord_from, note_to in list(easy_chords_translation.items()):
                 if chord_from not in array_valid_chords and chord_from in array_chords:
                     pos = 0
                     if (array_chords[chord_from]*100)/chord_count <= chord_threshold*100:
@@ -3289,7 +3289,7 @@ def reduce_chords(instrument, level, option, selected):
             chordto = list(str(chordto))
             for j in range(0, len(chordfrom)):
                 note = chordfrom[j]
-                for notenumber, notedata in notes_dict.items():
+                for notenumber, notedata in list(notes_dict.items()):
                     if notedata[1] == leveltext and notedata[2] == note:
                         chordfrom[j] = str(notenumber)
             chordfrom = ', '.join(chordfrom)
@@ -3310,7 +3310,7 @@ def reduce_chords(instrument, level, option, selected):
                         #We take the letter from the translation
                         note_letter = array_conversions_final[chord][j]
                         #We get the number of the note
-                        for notenumber, notedata in notes_dict.items():
+                        for notenumber, notedata in list(notes_dict.items()):
                             if notedata[1] == leveltext and notedata[2] == note_letter:
                                 note_number = notenumber
                         #We go through the notes in the chord and look for the position for the note
@@ -3334,7 +3334,7 @@ def reduce_chords(instrument, level, option, selected):
                             new_chord[j].append(note[j][0])
                         for j in range(0, len(newchord_array)):
                             new_note = newchord_array[j]
-                            for notenumber, notedata in notes_dict.items():
+                            for notenumber, notedata in list(notes_dict.items()):
                                 if notedata[1] == leveltext and notedata[2] == new_note:
                                     chordto = notenumber
                             new_chord[2][j] = chordto
@@ -3410,7 +3410,7 @@ def reduce_by_pattern(instrument, level):
     
     instrumentname = ''
 
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes_"+level
@@ -3552,7 +3552,7 @@ def edit_by_mbt(instrument, level, measure, beat, tick, notes, selected):
     array_validnotes = [] #The final array going in the array of notes and events
     array_notes = []
     
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname:
@@ -3621,7 +3621,7 @@ def copy_od_solo():
     
     instrumentname = ''
     
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes"
@@ -3653,7 +3653,7 @@ def copy_od_solo():
         
         instrumentname = ''
         
-        for instrument_name, instrument_id in tracks_array.items():
+        for instrument_name, instrument_id in list(tracks_array.items()):
             if instrument_id == instrument_b:
                 instrumentname = instrument_name
                 
@@ -3689,7 +3689,7 @@ def add_slides(instrument, selected):
     array_validnotes = [] #The final array going in the array of notes and events
     array_notes = []
     
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes"
@@ -3739,7 +3739,7 @@ def tubes_space(instrument, selected):
     instrumentname = ''
     old_note = []
     leveltext = "phrase"
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
 
@@ -3833,7 +3833,7 @@ def capitalize_first(instrument, selected):
     instrumentname = ''
     old_note = []
     leveltext = "phrase"
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
 
@@ -3893,7 +3893,7 @@ def check_capitalization(instrument, selected):
     instrumentname = ''
     old_note = []
     leveltext = "phrase"
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
 
@@ -3999,7 +3999,7 @@ def export_lyrics(instrument, phrasing):
     instrumentname = ''
     old_note = []
     leveltext = "phrase"
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
 
@@ -4059,7 +4059,7 @@ def unpitch(instrument, character, selected):
     array_validnotes = [] #The final array going in the array of notes and events
     array_notes = []
     
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes"
@@ -4097,7 +4097,7 @@ def pitch(instrument, selected):
     array_validnotes = [] #The final array going in the array of notes and events
     array_notes = []
     
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes"
@@ -4132,7 +4132,7 @@ def hide_lyrics(instrument, selected):
     array_validnotes = [] #The final array going in the array of notes and events
     array_notes = []
     
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes"
@@ -4166,7 +4166,7 @@ def show_lyrics(instrument, selected):
     array_validnotes = [] #The final array going in the array of notes and events
     array_notes = []
     
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes"
@@ -4201,7 +4201,7 @@ def create_phrase_markers(instrument, grid, mute):
     array_validnotes = [] #The final array going in the array of notes and events
     array_validevents = []
     
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes"
@@ -4347,7 +4347,7 @@ def trim_phrase_markers(instrument, grid):
     array_notes = []
     array_od = []
     
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes"
@@ -4486,7 +4486,7 @@ def compact_harmonies(precedence, grid):
     array_lyrics_h2 = []
     array_lyrics_h3 = []
 
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     notes_dict = notesname_array[notesname_instruments_array[instrumentname]]
@@ -4629,7 +4629,7 @@ def add_vocalsoverdrive(instrument, frequency, mute):
 
     array_validnotes = []
     
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "phrase"
@@ -4729,7 +4729,7 @@ def cleanup_phrases(instrument):
     array_notes = []
     array_remove = []
 
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     notes_dict = notesname_array[notesname_instruments_array[instrumentname]]
@@ -4808,7 +4808,7 @@ def compact_phrases():
         array_notes_h1 = []
         array_notes_h2 = []
 
-        for instrument_name, instrument_id in tracks_array.items():
+        for instrument_name, instrument_id in list(tracks_array.items()):
             if instrument_id == instrument:
                 instrumentname = instrument_name
         notes_dict = notesname_array[notesname_instruments_array[instrumentname]]
@@ -4946,7 +4946,7 @@ def create_singalong(instrument):
     start_part = array_instrument_data[3]
     array_notesevents = create_notes_array(array_instrument_notes)
 
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     notes_dict = notesname_array[notesname_instruments_array[instrumentname]]
@@ -5028,7 +5028,7 @@ def create_keys_animations():
     start_part = array_instrument_data[3]
     array_notesevents = create_notes_array(array_instrument_notes)
 
-    for instrument_name, instrument_id in tracks_array.items():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument_keys:
             instrumentname = instrument_name
     notes_dict = notesname_array[notesname_instruments_array[instrumentname]]

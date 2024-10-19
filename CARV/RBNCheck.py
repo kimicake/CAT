@@ -977,7 +977,7 @@ def handle_guitar(content, part_name ):
                 
                 localTmpl[ output_part_var + "_chords_easy"] += '<div class="row-fluid"><span class="span12"><strong class="">{}</strong> <span>{} chord not allowed</span> </span></div>'.format( format_location( b ), gems_text[:-3] )     
                 has_error = True
-        counter_chord_easy = [x_y3 for x_y3 in iter(counter_global.items()) if x_y3[1] >= 2]
+        counter_chord_easy = [x_y3 for x_y3 in iter(list(counter_global.items())) if x_y3[1] >= 2]
 
         debug( "=================== ENDS EASY " + part_name + ": No Chords ===================", True )
         
@@ -1650,7 +1650,7 @@ def handle_keys(content, part_name ):
                     
                     localTmpl[ midi_notes_output_var[ idx_notes ] ] += '<div class="row-fluid"><span class="span12"><strong class="">{}</strong> <span>{} chord not allowed</span> </span></div>'.format( format_location( b ), gems_text[:-3] )
                     has_error = True
-            counter_chord_easy = [x_y2 for x_y2 in iter(counter_global.items()) if x_y2[1] >= 2]
+            counter_chord_easy = [x_y2 for x_y2 in iter(list(counter_global.items())) if x_y2[1] >= 2]
             debug( "=================== ENDS " + midi_notes_text[ idx_notes ] + " KEYS: " + str( midi_notes_max[ idx_notes ] ) + " notes Chords ===================", True )
         
         #No gems under solo marker
@@ -1998,7 +1998,7 @@ def handle_pro_keys(content, part_name ):
         debug("", True)
 
         debug("Will validate with {} max notes".format(max_notes), True)        
-        for position, value in c.items():
+        for position, value in list(c.items()):
  
             debug( "{} notes found at {}".format( value, format_location( position ) ), True )
 
