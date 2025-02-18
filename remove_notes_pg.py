@@ -22,6 +22,8 @@ def execute(sel):
     hard = hChkvar.get()
     medium = mChkvar.get()
     easy = eChkvar.get()
+    instrument = str(instrument_var.get())
+    instrument = C3toolbox.array_instruments[instrument]
 
     #RPR_ShowConsoleMsg(array_grid[grid]+" - "+array_levels[level][0]+" - "+instrument+" - "+tolerance+" - "+same+" - "+sparse+" - "+bend+" - "+str(sel))
     #RPR_ShowConsoleMsg(instrument+" - "+level+" - "+grid+" - "+tolerance+" - "+bend+" - "+same+" - "+sparse)
@@ -35,15 +37,15 @@ def execute(sel):
     C3toolbox.PM(str(easy))
     if hard:
         C3toolbox.PM("go hard")
-        C3toolbox.remove_notes_prokeys('s','h','PART REAL_KEYS_H',20,0)
+        C3toolbox.remove_notes_pg('s','h',instrument,20,0)
 
     if medium:
         C3toolbox.PM("go medium")
-        C3toolbox.remove_notes_prokeys('s','m','PART REAL_KEYS_M',20,0)
+        C3toolbox.remove_notes_pg('s','m',instrument,20,0)
 
     if easy:
         C3toolbox.PM("go easy")
-        C3toolbox.remove_notes_prokeys('s','e','PART REAL_KEYS_E',20,0)
+        C3toolbox.remove_notes_pg('s','e',instrument,20,0)
         
     #(what,level,instrument,how,same,sparse,bend,selected)
     #C3toolbox.remove_notes('q', 'x', '', 10, 0, 0, 0, 0)
@@ -61,6 +63,11 @@ def launch():
     getFld = tkinter.IntVar()
     form.wm_title('Reduce notes')
     C3toolbox.startup()
+    instrument_name = C3toolbox.get_trackname()
+    if instrument_name in C3toolbox.array_dropdownid:
+        instrument_id = C3toolbox.array_dropdownid[instrument_name]
+    else:
+        instrument_id = 0
 
     # STEP 1    
 
@@ -85,6 +92,21 @@ def launch():
     eChk.grid(row=1, column=3, sticky='W', padx=5, pady=2)
     eChk.select()
 
+    stepTwo = tkinter.LabelFrame(form, text="Select instrument")
+    stepTwo.grid(row=1, columnspan=5, sticky='WE', 
+            padx=5, pady=5, ipadx=5, ipady=5)
+
+    OPTIONS = ["Pro Guitar", "Pro Guitar (22)", "Pro Bass", "Pro Bass (22)"]
+
+    if instrument_id in range(8,11+1):
+        instrument_id = instrument_id - 8
+
+    if instrument_id > len(OPTIONS) - 1: instrument_id = 0
+    instrument_var = tkinter.StringVar(stepTwo)
+    instrument_var.set(OPTIONS[instrument_id]) # default value
+
+    instrumentOpt = tkinter.OptionMenu(*(stepTwo, instrument_var) + tuple(OPTIONS))
+    instrumentOpt.grid(row=0, column=1, columnspan=1, padx=5, sticky="WE", pady=3)
 
     # HELP
 

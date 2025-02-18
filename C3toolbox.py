@@ -1,6 +1,7 @@
 # -*- coding: cp1252 -*-
 # -*- additions by: Alternity, kueller -*-
 from reaper_python import *
+import traceback
 import operator
 import decimal
 import base64
@@ -9,7 +10,29 @@ import binascii
 import os
 import re
 import sys
-from C3notes import *
+import codecs
+import sys
+
+
+import reaper_python as rpy
+
+# Override this internal REAPER function to ignore unicode.
+def rpr_unpacks(v):
+    return str(v.value.decode('ascii', 'ignore'))
+
+rpy.rpr_unpacks = rpr_unpacks
+
+class ReaperConsole:
+    def write(self, output):
+        if output != "":
+            RPR_ShowConsoleMsg(output)
+
+    def flush(self):
+        pass
+
+reaper_console = ReaperConsole()
+
+sys.stderr = reaper_console
 
 global end_event
 global tracks_array
@@ -22,7 +45,6 @@ global divisions_array
 global sustains_array
 global default_pause
 global sustainspace_array
-global sustains_array
 global debug
 global array_instruments
 global array_levels
@@ -35,6 +57,8 @@ global double_pedal_bpm
 global twohit_drums
 global chord_threshold
 global phrase_char
+
+from C3notes import *
 
 ###########################################################
 #
@@ -80,9 +104,9 @@ array_instruments = {
         "Harmony 2" : "HARM2",
         "Harmony 3" : "HARM3",
         "Pro Guitar" : "PART REAL_GUITAR",
-        "Pro Guitar 22" : "PART REAL_GUITAR_22",
+        "Pro Guitar (22)" : "PART REAL_GUITAR_22",
         "Pro Bass" : "PART REAL_BASS",
-        "Pro Bass 22" : "PART REAL_BASS_22"
+        "Pro Bass (22)" : "PART REAL_BASS_22"
         }
 
 array_dropdownid = { "PART DRUMS" : 0,
@@ -98,9 +122,9 @@ array_dropdownid = { "PART DRUMS" : 0,
                      "PART RHYTHM": 6,
                      "PART VOCALS": 7,
                      "PART REAL_GUITAR": 8,
-                     "PART REAL_GUITAR_22": 8,
-                     "PART REAL_BASS": 9,
-                     "PART REAL_BASS_22": 9
+                     "PART REAL_GUITAR_22": 9,
+                     "PART REAL_BASS": 10,
+                     "PART REAL_BASS_22": 11
                  }
 
 array_dropdownvocals = { "PART VOCALS" : 0,
@@ -203,7 +227,10 @@ def PM(message):
     global config
     
     if config['debug'] == '1':
-        RPR_ShowConsoleMsg(str(message))
+        if message != "":
+            RPR_ShowConsoleMsg(str(message))
+        else:
+            RPR_ShowConsoleMsg("PM: Empty string caught")
 
 def log(function, var):
     
@@ -212,7 +239,10 @@ def log(function, var):
         #with open ("log.txt", "a") as myfile:
             #myfile.write("appended text")
     a=5
-            
+
+def exit_exception(exception):
+    RPR_MB("CAT ran into an unexpected error.\n\n" + traceback.format_exc(), "Unhandled error", 0)
+
 def get_curr_project_filename():
     proj = RPR_EnumProjects(-1, "", 512)
     if proj[2] == "":
@@ -226,7 +256,7 @@ def count_notes(array, start, end, notes, what, instrument):
     #Returns an array with notes as key and note count as value, sorted by value, descending
     
     instrument_name = ''
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     notes_dict = notesname_array[notesname_instruments_array[instrumentname]]
@@ -245,7 +275,7 @@ def count_notes(array, start, end, notes, what, instrument):
             else:
                 array_count[str(array[x][2])]= 1
     
-    array_count = sorted(array_count.iteritems(), key=operator.itemgetter(1), reverse=True)
+    array_count = sorted(iter(list(array_count.items())), key=operator.itemgetter(1), reverse=True)
     return array_count
 
 
@@ -353,7 +383,7 @@ def sections(array_notesevents, what):
 def level(array, instrument):
     #Returns the selected level, instrument is id
     instrument_name = ''
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     notes_dict = notesname_array[notesname_instruments_array[instrumentname]]
@@ -389,7 +419,7 @@ def level(array, instrument):
     return 'x'
 
 def remap_notes(array_chords, array_translation): #Remap all chords in a song to allowed chords
-    array_chords_sorted = sorted(array_chords.iteritems(), key=operator.itemgetter(1), reverse=True)
+    array_chords_sorted = sorted(iter(list(array_chords.items())), key=operator.itemgetter(1), reverse=True)
     array_valid_chords = []
     #We get the most used chords and build an array
     for j in range(0, len(array_translation)):
@@ -455,13 +485,15 @@ def get_trackid(): #Returns the id for the currently selected track
 def get_trackname(): #Returns the name for the currently selected track
     instrument = get_trackid()
     instrumentname = ''
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if instrumentname:
         return instrumentname
 
 def get_time_signatures(instrument_ticks):
+    PM("get_time_signatures start")
+    PM("\n")
     #This function creates measures array, an array containing all measures with their TS, BPM, starting point, etc.
     tsden_array = {'1048' : 16, '983' : 15, '917' : 14, '851' : 13, '786' : 12, '720' : 11, '655' : 10, '589' : 9, '524' : 8, '458' : 7, '393' : 6, '327' : 5, '262' : 4, '196' : 3, '131' : 2, '65': 1}
     tsnum_array = {16 : 577, 15 : 41, 14 : 505, 13 : 969, 12 : 433, 11 : 897, 10 : 361, 9: 825, 8 : 289, 7 : 753, 6 : 217, 5 : 681, 4 : 145, 3: 609, 2 : 73, 1: 537}
@@ -470,17 +502,30 @@ def get_time_signatures(instrument_ticks):
     #7/8: 524 and 295 (289 is 1, 289+6 is 7)
     maxlen = 1048576
     trkptr = RPR_CSurf_TrackFromID(0,0)
+    PM("RPR_CSurf_TrackFromID")
+    PM("\n")
 
     # Get Envelope Pointer:
     envptr = RPR_GetTrackEnvelopeByName( trkptr, 'Tempo map' )
+    PM("RPR_GetTrackEnvelopeByName")
+    PM("\n")
+
     envstr = ''
     # Get Envelope Data:
     envstate = RPR_GetSetEnvelopeState(envptr, envstr, maxlen)
+    PM("RPR_GetSetEnvelopeState")
+    PM("\n")
+
     nodes_array = []
     timesigchanges_array = []
     timesignature = '262148' #By default it's 4/4
     chunk = ""+envstate[2]
-    vars_array = chunk.split("\n")
+    vars_array = chunk.splitlines()
+    PM(f"vars_array len: {len(vars_array)}")
+
+    for item in vars_array:
+        PM(item)
+        PM("\n")
     
     #Create an array of 0. seconds of the point, 1. BPM, 2. time signature denominator, 3. time signature numerator , 4. ticks since 0
     for j in range(0, len(vars_array)):
@@ -506,23 +551,64 @@ def get_time_signatures(instrument_ticks):
             node_array.append(timesignature_denominator)
             nodes_array.append(node_array)
 
+    PM("loop 1")
+    PM("\n")
+
+    PM("nodes_array")
+    PM("\n")
+
+    PM(len(nodes_array))
+    PM("\n")
+
+    for item in nodes_array:
+        PM(item)
+        PM("\n")
+
+
     #Create an array of TS changes: 0. BPM, 1. time signature denominator, 2. time signature numerator, 3. ticks passed since 0 
+    #decimal.Decimal(ticks_passed)
     ticks_passed = 0
+
     if len(nodes_array) > 0:
         old_ts = str(nodes_array[0][2])+str(nodes_array[0][3])
         timesigchanges_array.append([nodes_array[0][0], nodes_array[0][2], nodes_array[0][3], 0])
         nodes_array[0].append(0)
         for j in range(1, len(nodes_array)):
+
+            PM(j)
+            PM("\n")
+
             ticks_per_second = (instrument_ticks*nodes_array[j-1][1])/60
+            PM(f"{j} - 1: {ticks_per_second}")
+            PM("\n")
             time_passed = nodes_array[j][0]-nodes_array[j-1][0]
+            PM(f"{j} - 2: {time_passed}")
+            PM("\n")
             ticks_passed = (time_passed*ticks_per_second)+ticks_passed
-            ticks_passed = decimal.Decimal(ticks_passed)
+            PM(f"{j} - 3: {ticks_passed}")
+            PM("\n")
+            ticks_passed = ticks_passed
+            PM(f"{j} - 4: {ticks_passed}")
+            PM("\n")
             ticks_passed = round(ticks_passed,10)
+            PM(f"{j} - 5: {ticks_passed}")
+            PM("\n")
             nodes_array[j].append(ticks_passed)
+            PM(f"{j} - 6")
+            PM("\n")
             cur_ts = str(nodes_array[j][2])+str(nodes_array[j][3])
-            if(old_ts <> cur_ts):
+            PM(f"{j} - 7")
+            PM("\n")
+            if(old_ts != cur_ts):
                 timesigchanges_array.append([nodes_array[j][0], nodes_array[j][2], nodes_array[j][3], ticks_passed])
-            old_ts = str(nodes_array[j][2])+str(nodes_array[j][3])         
+                PM(f"{j} - 7b")
+                PM("\n")
+            old_ts = str(nodes_array[j][2])+str(nodes_array[j][3])   
+            PM(f"{j} - 8")
+            PM("\n")     
+
+        PM("loop 2")
+        PM("\n")
             
         #PM(nodes_array)
         #Loop through the TS array and for each time signature span find out duration and then divide by numerator and denominator. The result is the number of measures in that ts
@@ -548,14 +634,41 @@ def get_time_signatures(instrument_ticks):
                 ticks_start = round(ticks_start, 0)
                 ticks_start = int(ticks_start)
                 measures_array.append([m, ticks_start, timesigchanges_array[x-1][1], timesigchanges_array[x-1][2], divider])
+
+        PM(f"measures_array len: {len(measures_array)}\n")
+
+        PM("loop 3")
+        PM("\n")
+
         #Now we need to add all measures from the last (or in some cases only) BPM marker to the end of the song, marked by the end event
         ticks_start = float(timesigchanges_array[len(timesigchanges_array)-1][3])
+        PM("3.1 - ")
+        PM(ticks_start)
+        PM("\n")
         ticks_start = round(ticks_start, 0)
+        PM("3.2 - ")
+        PM(ticks_start)
+        PM("\n")
         ticks_start = int(ticks_start)
+        PM("3.3 - ")
+        PM(ticks_start)
+        PM("\n")
         ticks_per_measure = instrument_ticks/(timesigchanges_array[x][2]*0.25)
+        PM("3.4 - ")
+        PM(ticks_per_measure)
+        PM("\n")
         ticks = ticks_per_measure*timesigchanges_array[x][1]
+        PM("3.5 - ")
+        PM(ticks)
+        PM("\n")
         ticks_per_beat = ticks/timesigchanges_array[x][2]
+        PM("3.6 - ")
+        PM(ticks_per_beat)
+        PM("\n")
         ticks_startmeasure = ticks_start
+        PM("3.7 - ")
+        PM(ticks_startmeasure)
+        PM("\n")
         loop_measure = 0
         while (ticks_startmeasure < end_event+ticks): #The whole loop runs for one measure longer than the end event
             m+=1
@@ -565,10 +678,17 @@ def get_time_signatures(instrument_ticks):
         #Now we add the BPM for each measure taking the BPM value of the measure from nodes_array
         ok = 0
 
+        PM("measures_array len: ")
+        PM(len(measures_array))
+        PM("\n")
+
+        PM("while")
+        PM("\n")
+
         for x in range(0, len(measures_array)):
             ticks_start = measures_array[x][1]
             ok = 0
-            for j in reversed(range(0, len(nodes_array))):
+            for j in reversed(list(range(0, len(nodes_array)))):
                 #PM("\n")
                 #PM(str(int(round(float(ticks_start), 0)))+" <= "+str(int(float(nodes_array[j][4])))+" : "+str(nodes_array[j][1]))
                 if int(round(float(ticks_start), 0)) >= int(float(nodes_array[j][4])):
@@ -581,6 +701,9 @@ def get_time_signatures(instrument_ticks):
                 ok = 0
         #PM("\n")
         #PM(measures_array)
+        #PM("\n")
+        PM("returning...")
+        PM("\n")
         return measures_array
     
 
@@ -592,10 +715,11 @@ def process_instrument(instrument): #Creates an array of all notes/events
     chunk = ""
     maxlen = 1048576
     (boolvar, mi, chunk, maxlen) = RPR_GetSetItemState(mi, chunk, maxlen)
+    #PM(chunk)
     vars_array = ""
     notes_array = []
     conto_vars_array = 0
-    vars_array = chunk.split("\n")
+    vars_array = chunk.splitlines()
     conto_vars_array = len(vars_array)
     alertstring="real_keys_lh"+" - "+str(conto_vars_array)+"\n"
     noteloc = 0
@@ -623,7 +747,14 @@ def process_instrument(instrument): #Creates an array of all notes/events
                 encText = vars_array[j+1]
                 encClose = vars_array[j+2]
                 notes_array.append(note[0]+" "+str(noteloc)+" "+note[2]+" "+str(encText)+" "+encClose)
-                if base64.b64decode(str(encText))[2:] == '[end]':
+
+                _temp_event = base64.b64decode(str(encText))
+                _temp_event = _temp_event[2:]
+                _temp_event = codecs.decode(_temp_event, 'utf-8')
+
+                PM(f"{_temp_event}\n")
+
+                if _temp_event == '[end]':
                     end_event = noteloc
         elif "HASDATA" in vars_array[j]:
             note = vars_array[j].split(" ")
@@ -647,16 +778,21 @@ def create_notes_array(notes): #instrument is the instrument shortname, NOT the 
                         #0. 'E' or 'e' (unselected or selected), 1. location, 2. pitch, 3. velocity, 4. duration, 5. noteonoffchannel
     array_events = [] #An array containing only text markers/events
     #First off we sort the notes from the markers, so it's easier to loop through notes
-
+    PM("create_notes_array start\n")
+    PM(f"len: {len(notes)}\n")
     for x in range(0, len(notes)):
         if notes[x].startswith('E') or notes[x].startswith('e'):
             array_rawnotes.append(notes[x])
         else:
             array_rawevents.append(notes[x])
     #Now we loop through the notes to remove all note off events and set a length for the notes
+    
+    PM("loop 1")
+    PM("\n")
 
     for x in range(0, len(array_rawnotes)):
         note_bit = array_rawnotes[x].split(" ")
+        #PM(f"{note_bit}\n")
         if note_bit[2].startswith('9') and note_bit[4] != '00':
             for y in range(x, len(array_rawnotes)):
                 cur_note = array_rawnotes[y].split(" ")
@@ -667,34 +803,85 @@ def create_notes_array(notes): #instrument is the instrument shortname, NOT the 
                     #PM("\n")
                     array_notes.append([note_bit[0], int(note_bit[1]), int(note_bit[3]), note_bit[4], (int(cur_note[1])-int(note_bit[1])), note_bit[2]])
                     break
-             
+    PM("loop 2")
+    PM("\n")
+
     for x in range(0, len(array_rawevents)):
         note_bit = array_rawevents[x].split(" ")
+        PM(f"- 1: {note_bit}\n")
         encText = note_bit[3]
-        event_header = str(binascii.a2b_base64(encText).encode("hex"))[:4]
-        lyric = base64.b64decode(str(encText))[2:]
+        PM(f"- 2: {encText}\n")
+
+        event_header = binascii.a2b_base64(encText)
+        PM(f"- 3.1: {event_header}\n")
+
+        event_header = codecs.encode(event_header, 'hex_codec')
+        PM(f"- 3.2: {event_header}\n")
+
+        event_header = codecs.decode(event_header, 'utf-8')
+        PM(f"- 3.3: {event_header}\n")
+
+        event_header = event_header[:4]
+        PM(f"- 3.4: {event_header}\n")
+
+        PM("\n")
+        lyric = base64.b64decode(str(encText))
+        PM(f"- 4.1: {lyric}\n")
+        lyric = lyric[2:]
+        lyric = codecs.decode(lyric, 'utf-8')
+        PM(f"- 4.2: {lyric}\n")
         array_events.append([note_bit[0], int(note_bit[1]), note_bit[2], str(lyric), note_bit[4], event_header])
+        PM(f"- 5: {[note_bit[0], int(note_bit[1]), note_bit[2], str(lyric), note_bit[4], event_header]}")
+        PM("\n")
     
+    PM("loop 3")
+    PM("\n")
+
+    PM(f"len: {len(array_notes)}, {len(array_events)}\n")
+
     return [array_notes, array_events] 
 
 def rebuild_array(array_notesevents):
+    PM("rebuild_array start\n")
+    PM(f"len: {len(array_notesevents)}\n")
     global end_of_track
     global correct_tqn
     #Create a new temp array
     array_temp = [] #This array will contain all events/notes and it will be used for sorting. Its content will then go in a raw text array
     array_raw = []  
     #Loop through each note and convert the note on event in raw format to add it to the raw array
+    PM("loop 1\n")
     for x in range(0, len(array_notesevents[0])):
         
         array_temp.append([array_notesevents[0][x][0], int(array_notesevents[0][x][1]), array_notesevents[0][x][5], (hex(int(array_notesevents[0][x][2])))[2:], array_notesevents[0][x][3]])
         #and create a note off event with absolute location
         array_temp.append([array_notesevents[0][x][0], int(array_notesevents[0][x][1])+int(array_notesevents[0][x][4]), str("8"+str(array_notesevents[0][x][5])[1:]),(hex(int(array_notesevents[0][x][2])))[2:], "00"])
     
+    PM("loop 2\n")
     for x in range(0, len(array_notesevents[1])):
-        hex_lyric = array_notesevents[1][x][5] + array_notesevents[1][x][3].encode("hex")
-        encoded_text = str(base64.encodestring(hex_lyric.decode('hex')))
-        #PM("encoded_text: "+encoded_text+"\n")
+        PM("2.1\n")
+        PM(f"{array_notesevents[1][x][5]}\n")
+        PM(f"{array_notesevents[1][x][3]}\n")
+        PM(f"{ binascii.hexlify(array_notesevents[1][x][3].encode()).decode('utf-8') }\n")
+        hex_lyric = array_notesevents[1][x][5] + binascii.hexlify(array_notesevents[1][x][3].encode()).decode('utf-8')
+        PM(f"{ hex_lyric }\n")
+        PM("2.2\n")
+        encoded_text = str( base64.b64encode( codecs.decode(hex_lyric, 'hex_codec') ).decode('utf-8') )
+        PM("encoded_text: "+encoded_text+"\n")
+        PM("2.3\n")
+        PM(array_notesevents[1][x][0])
+        PM(",")
+        PM(int(array_notesevents[1][x][1]))
+        PM(",")
+        PM(array_notesevents[1][x][2])
+        PM(",")
+        PM(encoded_text)
+        PM(",")
+        PM(array_notesevents[1][x][4])
+        PM("\n")
         array_temp.append([array_notesevents[1][x][0], int(array_notesevents[1][x][1]), array_notesevents[1][x][2], encoded_text, array_notesevents[1][x][4]])
+    
+    PM("loops end\n")
     #Incorporate the events from array_rawevents and sort by absolute location
     array_temp.sort(key=operator.itemgetter(1,0))
     
@@ -711,26 +898,43 @@ def rebuild_array(array_notesevents):
         array_raw.append(array_temp[0][0]+" "+str(array_temp[0][1])+" "+str(array_temp[0][2])+" "+str(array_temp[0][3])+" "+str(array_temp[0][4])) 
     else:
         array_raw.append(array_temp[0][0]+" "+str(array_temp[0][1])+" "+str(array_temp[0][2])+"\n  "+str(array_temp[0][3])+"\n"+str(array_temp[0][4]))
-        
+    PM("loop 3\n")
     for x in range(1, len(array_temp)):
         new_location = array_temp[x][1]-array_temp[x-1][1]
+
+        #PM(array_temp[x][0])
+        #PM(" ")
+        #PM(str(new_location))
+        #PM(" ")
+        #PM(str(array_temp[x][2]))
+        #PM(" ")
+        #PM(array_temp[x][3])
+        #PM(" ")
+        #PM(array_temp[x][4])
+        #PM("\n")
+        
+
         if array_temp[x][0].startswith('E') or array_temp[x][0].startswith('e'): 
             array_raw.append(array_temp[x][0]+" "+str(new_location)+" "+str(array_temp[x][2])+" "+str(array_temp[x][3])+" "+str(array_temp[x][4]))
         else:
             array_raw.append(array_temp[x][0]+" "+str(new_location)+" "+str(array_temp[x][2])+"\n  "+array_temp[x][3]+"\n"+str(array_temp[x][4]))
     #PM(array_raw)       
+    PM("loop end\n")
     return array_raw
     
 
 def rebuild_chunk(notes_array, instrument, end, start):
+    PM("rebuild_chunk start\n")
     #Let's start by putting the notes/events portion of the chunk back together. The array is already prepped here.
     noteschunk = ""
+    PM("loop 1\n")
     for x in range(0, len(notes_array)):
         if notes_array[x].startswith('E') or notes_array[x].startswith('e'):
             noteschunk+=notes_array[x]+"\n"
         else:
             #event = notes_array[x].split("|")
-            #PM(notes_array[x]) 
+            PM(notes_array[x]) 
+            PM("\n")
             #noteschunk+=event[0]+"\n"+event[1]+"\n"+event[2]+"\n"
             noteschunk+=notes_array[x]+"\n"
     #The notes/events portion of the chunk is done, now we loop through the whole chunk to find the spot where we need to snip    
@@ -741,17 +945,25 @@ def rebuild_chunk(notes_array, instrument, end, start):
     instrument = ""
     subchunk = ""
     (boolvar, bi, subchunk, maxlen) = RPR_GetSetItemState(bi, subchunk, maxlen)
-    vars_array = subchunk.split("\n")
 
+    vars_array = subchunk.splitlines()
+    PM(f"{len(vars_array)}")
+
+    PM("loop 2\n")
     for j in range(0, end+1):
         first_chunk+=vars_array[j]+"\n"
-        
+
+    PM("loop 3\n")
+    PM(f"{start} - {len(vars_array)}\n")
     for k in range(start, len(vars_array)):
-        second_chunk+=vars_array[k]
-        if k < vars_array :
+        #PM(f"'-{vars_array[k]}'\n")
+        PM(f"{k}\n")
+        second_chunk += str(vars_array[k])
+        if k < len(vars_array) :
             second_chunk+="\n"
             
     chunk = first_chunk+noteschunk+second_chunk
+    PM("end\n")
     return chunk
 
 def prep_tracks():
@@ -766,6 +978,7 @@ def prep_tracks():
         chunk = ""
         instrument = ""
         (boolvar, mi, chunk, maxlen) = RPR_GetSetItemState(mi, chunk, maxlen)
+        
         #CYCLING THROUGH ALL TRACKS TO FIND THOSE RELEVANT
         #This check needs to go off everytime a command is issued because if the user changes position of the tracks the IDs change
         if "PART BASS" == trackname:
@@ -814,15 +1027,20 @@ def prep_tracks():
             tracks_array["PART REAL_BASS_22"] = i          
         else:
             instrument = "???"
-    #PM("\ntracks_array:\n")
-    #PM(tracks_array)
+    PM("\ntracks_array:\n")
+    PM(tracks_array)
 
 def write_midi(instrument, array, end_part, start_part):
+    PM("write_midi start\n")
     global maxlen
     rebuilt_array = rebuild_array(array)
+    PM("write_midi 1\n")
     chunk = rebuild_chunk(rebuilt_array, instrument, end_part, start_part)
+    PM("write_midi 2\n")
     mi = RPR_GetMediaItem(0,instrument)
+    PM("write_midi 3\n")
     (boolvar, mi, chunk, maxlen) = RPR_GetSetItemState(mi, chunk, maxlen)
+    PM("write_midi end\n")
 
 ###########################################################
 
@@ -863,7 +1081,7 @@ def polish_notes(instrument, grid, tolerance, selected):
     array_notes = array_notesevents[0]
     array_events = array_notesevents[1]
 
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname or "VOCALS" in instrumentname:
@@ -920,7 +1138,7 @@ def cleanup_notes(instrument, grid, level, selected):
     array_events = array_notesevents[1]
 
     leveltext = level
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname:
@@ -984,13 +1202,19 @@ def create_beattrack(halve, sel): #Call with halve to create an halved beat trac
     else:
         moltiplicatore = 1
     #Get notes array
+    PM("Processing Instrument...\n")
     array_instrument_data = process_instrument(tracks_array["BEAT"])
+    PM("Processed Instrument\n")
     array_instrument_notes = array_instrument_data[1]
     end_part = array_instrument_data[2]
     start_part = array_instrument_data[3]
     array_notes = create_notes_array(array_instrument_notes)
+
+    #PM(array_notes)
+
     array_beats = [] #0. 'e', 1. location, 2. pitch, 3. velocity, 4. duration, 5. noteonoffchannel
     last_measure = len(measures_array)
+    PM(f"last_measure: {last_measure}\n")
     first_measure = 1
     if(sel):
         array_beats_full = array_notes[0]
@@ -1033,6 +1257,10 @@ def create_beattrack(halve, sel): #Call with halve to create an halved beat trac
                 else:
                     ticks_start+=correct_tqn*moltiplicatore
         evenodd+=1
+    PM("create_beattrack end\n")
+
+    #PM([array_beats, array_notes[1]])
+
     write_midi(tracks_array["BEAT"], [array_beats, array_notes[1]], end_part, start_part)
 
 def create_triplets(instrument):
@@ -1102,7 +1330,7 @@ def remove_notes_prokeys(what,level,instrument,how,selected):
     sparse_position = 0
     old_note = []
     base_level = "notes_"+level
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname:
@@ -1166,6 +1394,8 @@ def remove_notes_prokeys(what,level,instrument,how,selected):
                 array_validnotes.append(note)
             else:
                 array_notes.append(note)
+    else:
+        return
 
     for x in range(0,len(base_array_notesevents[0])):
         note = base_array_notesevents[0][x]
@@ -1218,6 +1448,159 @@ def remove_notes_prokeys(what,level,instrument,how,selected):
     write_midi(instrument, [array_notes, array_notesevents[1]], end_part, start_part)
 
     
+def remove_notes_pg(what,level,instrument,how,selected):
+    #PM("\n\n"+what+" - "+level+" - "+instrument+" - "+str(how)+" - "+str(same)+" - "+str(sparse)+" - "+str(bend)+" - "+str(selected)+"\n\n")
+    #w/h/q/e, whole, half, quarter, eighth grid
+    #x/h/m/e, expert, hard, medium, easy
+    #"PART DRUMS"/etc. (leave "" to apply to currently selected track
+    #0-30, ticks tolerance
+    #0/1, not keep or keep same consecutive notes even if they are 1 grid level faster than 'what'
+    #0/1, detect pitch bends
+    global maxlen
+    global divisions_array
+    global sustains_array
+
+    diffs_tmp = {"h": "Hard", "m": "Medium", "e": "Easy"}
+
+    if instrument.startswith("PART REAL_GUITAR"):
+        base_inst_name = "PART GUITAR"
+    elif instrument.startswith("PART REAL_BASS"):
+        base_inst_name = "PART BASS"
+    else:
+        return
+
+    instrument = tracks_array[instrument]
+
+    base_instrument = tracks_array[base_inst_name]
+    #PM("\n\ninstrument: "+str(instrument))
+    array_instrument_data = process_instrument(instrument)
+    base_array_instrument_data = process_instrument(base_instrument)
+    array_instrument_notes = array_instrument_data[1]
+    array_base_instrument_notes = base_array_instrument_data[1]
+    end_part = array_instrument_data[2]
+    start_part = array_instrument_data[3]
+    array_notesevents = create_notes_array(array_instrument_notes)
+    base_array_notesevents = create_notes_array(array_base_instrument_notes)
+    division = int(math.floor((correct_tqn*4)*divisions_array[what]))
+    array_notes = [] #The final array going in the array of notes and events
+    array_tempnotes = [] #The temp array containing the objects
+    instrumentname = ''
+    position = 0
+    sparse_position = 0
+    old_note = []
+    base_level = "notes_"+level
+    for instrument_name, instrument_id in list(tracks_array.items()):
+        if instrument_id == instrument:
+            instrumentname = instrument_name
+    if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname:
+        level = "notes"
+    else:
+        level = "notes_"+level
+
+    notes_dict = notesname_array[notesname_instruments_array[instrumentname]]
+    base_notes_dict = notesname_array[notesname_instruments_array[base_inst_name]]
+    array_validnotes = []
+    first_measure = 0
+    last_measure = 0
+    if(selected):
+        first_measure = mbt(int(selected_range(array_notesevents[0])[0]))[0]
+        last_measure = mbt(int(selected_range(array_notesevents[0])[1]))[0]
+        if first_measure == last_measure:
+            result = RPR_MB( "This command works from measure to measure, please selected notes from at least 2 different measures", "Invalid selection", 0)
+            return
+    #PM("lunghezza: ")
+    #PM(len(array_notesevents[0]))
+    #PM("first_measure: "+str(first_measure)+" - last_measure: "+str(last_measure)+"\n")
+    #We filter out all OD, BRE, markers, etc.
+    for x in range(0,len(array_notesevents[0])):
+        note = array_notesevents[0][x]
+        if note[2] not in notes_dict:
+            invalid_note_mb(note, instrumentname)
+            return
+        this_measure = mbt(int(note[1]))[0]
+        if notes_dict[note[2]][1] == level and (selected == 0 or (selected and (this_measure >= first_measure and this_measure <= last_measure))):
+            array_validnotes.append(note)
+        else:
+            array_notes.append(note)
+    array_validpositions = []
+
+    # If the array is not empty prompt to overwrite
+    result = 6 # yes
+    if len(array_validnotes) > 0:
+        result = RPR_MB("Existing notes found in difficulty %s. Overwrite?" % diffs_tmp[level[-1]], "Reduce Pro G/B", 3)
+
+    # Copy higher difficulty into lower one.
+    if result == 6:
+        array_validnotes = []
+        level_array_tmp = ['x', 'h', 'm', 'e']
+        upper_level = level_array_tmp[level_array_tmp.index(level[-1]) - 1]
+        upper_level = "notes_"+upper_level
+        
+        for x in range(0, len(array_notesevents[0])):
+            note = array_notesevents[0][x]
+            if note[2] not in notes_dict:
+                invalid_note_mb(note, instrumentname)
+                return
+            this_measure = mbt(int(note[1]))[0]
+            if notes_dict[note[2]][1] == upper_level and (selected == 0 or (this_measure >= first_measure and this_measure <= last_measure)):
+                note_new = list(note)
+                note_new[2] = note_new[2]-24 # Lowering down one level
+
+                if note_new[2] in notes_dict:
+                    array_validnotes.append(note_new)
+    else:
+        return
+
+    for x in range(0,len(base_array_notesevents[0])):
+        note = base_array_notesevents[0][x]
+        this_measure = mbt(int(note[1]))[0]
+        if base_notes_dict[note[2]][1] == base_level and (selected == 0 or (selected and (this_measure >= first_measure and this_measure <= last_measure))):
+            valid_position = str(mbt(int(note[1]))[0])+"."+str(mbt(int(note[1]))[1])+"."+str(mbt(int(note[1]))[2])
+            array_validpositions.append(valid_position) 
+    #PM("array_validpositions: ")
+    #PM(array_validpositions)
+    
+    array_rolls = []
+    #Loop through all notes to find all markers, 126 or 127
+    #For each marker found, add to markers_array location and location-length
+    for x in range(0,len(array_notes)):
+        note = array_notes[x]
+        #PM(note)
+        this_measure = mbt(int(note[1]))[0]
+
+        if note[2] == 126 and (selected == 0 or (selected and (this_measure >= first_measure and this_measure <= last_measure))):
+            array_rolls.append([note[1], note[1]+note[4]])
+        elif note[2] == 127 and (selected == 0 or (selected and (this_measure >= first_measure and this_measure <= last_measure))):
+            array_rolls.append([note[1], note[1]+note[4]])
+            
+    array_rollnotes = []
+    for x in range(0,len(array_validnotes)):
+        note = array_validnotes[x]
+        for j in range(0, len(array_rolls)):
+            start = array_rolls[j][0]
+            end = array_rolls[j][1]
+            if note[1] >= start and note[1] <= end:
+                if note[1] not in array_rollnotes:
+                    array_rollnotes.append(note[1])
+            
+    #We pass the valid notes array through a function that returns an object array with one element per note/chord
+    array_validobjects = note_objects(array_validnotes)
+    
+    #We go through the notes to remove the unneeded notes
+    for x in range(0,len(array_validobjects)):
+        note = array_validobjects[x]
+        old_position = position
+        position = str(mbt(note[1][0])[0])+"."+str(mbt(note[1][0])[1])+"."+str(mbt(note[1][0])[2])
+        #PM("position:")
+        #PM(position)
+        #PM("\n")
+        if position in array_validpositions:
+            array_tempnotes.append(note)
+
+    #Now let's create array_notes using array_tempnotes
+    array_notes = add_objects(array_notes, array_tempnotes)
+    write_midi(instrument, [array_notes, array_notesevents[1]], end_part, start_part)
+
 def remove_notes(what,level,instrument,how,same,sparse,bend,selected):
     #PM("\n\n"+what+" - "+level+" - "+instrument+" - "+str(how)+" - "+str(same)+" - "+str(sparse)+" - "+str(bend)+" - "+str(selected)+"\n\n")
     #w/h/q/e, whole, half, quarter, eighth grid
@@ -1246,7 +1629,7 @@ def remove_notes(what,level,instrument,how,same,sparse,bend,selected):
     position = 0
     sparse_position = 0
     old_note = []
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname:
@@ -1337,7 +1720,7 @@ def remove_notes(what,level,instrument,how,same,sparse,bend,selected):
                     measure = mbt(position)[0]
                     bpm = measures_array[measure-1][5]
                    
-                    for key in sorted(sustains_array.iterkeys()):
+                    for key in sorted(sustains_array.keys()):
                         if key > bpm:
                             sustain_length = sustains_array[key]
                             break
@@ -1435,7 +1818,7 @@ def create_animation_markers(instrument, expression, pause, mute):
     if pause == 0:
         pause = default_pause
 
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname or "VOCALS" in instrumentname:
@@ -1499,10 +1882,10 @@ def create_animation_markers(instrument, expression, pause, mute):
                         location = note[1]+note[4] #Let's reset location right away
             #correct_tqn after the last valid expert note we drop the [idle_realtime] marker
             array_temp.append(['<X', location+correct_tqn, '0', '[idle_realtime]', '>', 'ff01'])
+            #PM(array_temp)
+            write_midi(instrument, [array_notesevents[0], array_temp], end_part, start_part)
         else:
             PM("no go")
-        #PM(array_temp)
-        write_midi(instrument, [array_notesevents[0], array_temp], end_part, start_part)
 
 def fix_sustains(instrument, level, fix, selected):
     #This function removes too short sustains. With fix = 1 it also shortens sustains based on instrument, difficulty and BPM.
@@ -1524,7 +1907,7 @@ def fix_sustains(instrument, level, fix, selected):
     instrumentname = ''
     old_note = []
     leveltext = level
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname:
@@ -1572,7 +1955,7 @@ def fix_sustains(instrument, level, fix, selected):
                 distance = array_validobjects[x+1][1][0]-end_position
                 #Let's get the sustain space based on BPM and difficulty
 
-                for key in sorted(sustainspace_array.iterkeys()):
+                for key in sorted(sustainspace_array.keys()):
                     if bpm <= key:
                         sustain_space = sustainspace_array[key][level]
                         break
@@ -1589,7 +1972,7 @@ def fix_sustains(instrument, level, fix, selected):
                         note[4][j] = new_distance
             
         #Once done, check if sustain is too long. In case, fix it
-        for key in sorted(sustains_array.iterkeys()):
+        for key in sorted(sustains_array.keys()):
             if bpm <= key:
                 sustain_length = sustains_array[key]
                 break
@@ -1619,7 +2002,7 @@ def single_snare(instrument,level, what, selected):
     instrumentname = ''
     old_note = []
     leveltext = level
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes_"+leveltext
@@ -1696,7 +2079,7 @@ def remove_kick(instrument,level, what, selected):
     instrumentname = ''
     old_note = []
     leveltext = level
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes_"+leveltext
@@ -1769,7 +2152,7 @@ def single_pedal(level, how, selected):
     array_notes = [] #The final array going in the array of notes and events
     instrumentname = ''
     leveltext = level
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes_"+leveltext
@@ -1925,7 +2308,7 @@ def flip_discobeat(instrument, level, selected, mute):
     array_notes = [] #The final array going in the array of notes and events
     instrumentname = ''
     leveltext = level
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes_"+leveltext
@@ -2036,7 +2419,7 @@ def unflip_discobeat(instrument, level, how, selected):
     array_notes = [] #The final array going in the array of notes and events
     instrumentname = ''
     leveltext = level
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes_"+leveltext
@@ -2114,8 +2497,8 @@ def unflip_discobeat(instrument, level, how, selected):
         if noteycount > snarecount:
             start_m = str(mbt(start)[0])
             end_m = str(mbt(end)[0])
-            if mute == 0:
-                result = RPR_MB( "The disco flip section from M"+start_m+" to M"+end_m+" looks already unflipped: proceed anyway?", "Section unflipped", 1 )
+            #if mute == 0:
+            result = RPR_MB( "The disco flip section from M"+start_m+" to M"+end_m+" looks already unflipped: proceed anyway?", "Section unflipped", 1 )
         
         if noteycount <= snarecount or result == 1:
             #Go through the disco array and every snare note in there is transformed in hi hat and viceversa.
@@ -2182,7 +2565,7 @@ def simplify_roll(instrument, level, selected):
     array_notes = [] #The final array going in the array of notes and events
     array_validnotes = []
 
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname:
@@ -2600,7 +2983,7 @@ def reduce_singlenotes(instrument, level, selected):
     array_validnotes = [] #The final array going in the array of notes and events
     array_notes = []
     
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname:
@@ -2652,7 +3035,7 @@ def reduce_singlenotes(instrument, level, selected):
             else:
                 array_chords[chord]=1
     unused = 0
-    for chord_type, chordcount in array_chords.iteritems():
+    for chord_type, chordcount in list(array_chords.items()):
         if (chordcount*100)/chord_count <= chord_threshold*100 and chord_type != 'O':
             unused = 1
 
@@ -2668,14 +3051,14 @@ def reduce_singlenotes(instrument, level, selected):
         array_valid_chords = array_conversions[1]
         array_conversions = array_conversions[0]
     elif level == 'e' and len(array_chords) == 1:
-        for note_from, note_to in array_chords.iteritems():
+        for note_from, note_to in list(array_chords.items()):
             array_conversions.append([note_from, easy_singlenotes_array[note_from]])
     elif (level == 'm' and 'O' not in array_chords) or (level == 'e' and 'O' not in array_chords and 'B' not in array_chords):
         #Do nothing
         c3 = 0
     elif (level == 'm' and 'O' in array_chords) or (level == 'e' and ('O'  in array_chords or 'B'  in array_chords)):
         chord_pattern = []
-        for note_from, note_to in array_chords.iteritems():
+        for note_from, note_to in list(array_chords.items()):
             chord_pattern.append(easy_chords_order[note_from])
         chord_pattern.sort()
         chord_text = ''
@@ -2699,7 +3082,7 @@ def reduce_singlenotes(instrument, level, selected):
         
         chordfrom = array_conversions[x][0]
         chordto = array_conversions[x][1]
-        for notenumber, notedata in notes_dict.iteritems():
+        for notenumber, notedata in list(notes_dict.items()):
             if notedata[1] == leveltext and notedata[2] == chordfrom:
                 chordfrom = str(notenumber)
         array_conversions_final[chordfrom] = chordto
@@ -2715,7 +3098,7 @@ def reduce_singlenotes(instrument, level, selected):
             #We take the letter from the translation
             note_letter = array_conversions_final[chord][0]
             #We get the number of the note
-            for notenumber, notedata in notes_dict.iteritems():
+            for notenumber, notedata in list(notes_dict.items()):
                 if notedata[1] == leveltext and notedata[2] == note_letter:
                     note_number = notenumber
             #We go through the notes in the chord and look for the position for the note
@@ -2743,7 +3126,7 @@ def reduce_chords(instrument, level, option, selected):
     array_validnotes = [] #The final array going in the array of notes and events
     array_notes = []
     
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname:
@@ -2856,7 +3239,7 @@ def reduce_chords(instrument, level, option, selected):
                 array_valid_chords = array_conversions[1]
                 array_conversions = array_conversions[0]
 
-            for chord_from, note_to in easy_chords_translation.iteritems():
+            for chord_from, note_to in list(easy_chords_translation.items()):
                 if chord_from not in array_valid_chords and chord_from in array_chords:
                     pos = 0
                     if (array_chords[chord_from]*100)/chord_count <= chord_threshold*100:
@@ -2906,7 +3289,7 @@ def reduce_chords(instrument, level, option, selected):
             chordto = list(str(chordto))
             for j in range(0, len(chordfrom)):
                 note = chordfrom[j]
-                for notenumber, notedata in notes_dict.iteritems():
+                for notenumber, notedata in list(notes_dict.items()):
                     if notedata[1] == leveltext and notedata[2] == note:
                         chordfrom[j] = str(notenumber)
             chordfrom = ', '.join(chordfrom)
@@ -2927,7 +3310,7 @@ def reduce_chords(instrument, level, option, selected):
                         #We take the letter from the translation
                         note_letter = array_conversions_final[chord][j]
                         #We get the number of the note
-                        for notenumber, notedata in notes_dict.iteritems():
+                        for notenumber, notedata in list(notes_dict.items()):
                             if notedata[1] == leveltext and notedata[2] == note_letter:
                                 note_number = notenumber
                         #We go through the notes in the chord and look for the position for the note
@@ -2951,7 +3334,7 @@ def reduce_chords(instrument, level, option, selected):
                             new_chord[j].append(note[j][0])
                         for j in range(0, len(newchord_array)):
                             new_note = newchord_array[j]
-                            for notenumber, notedata in notes_dict.iteritems():
+                            for notenumber, notedata in list(notes_dict.items()):
                                 if notedata[1] == leveltext and notedata[2] == new_note:
                                     chordto = notenumber
                             new_chord[2][j] = chordto
@@ -2962,6 +3345,189 @@ def reduce_chords(instrument, level, option, selected):
                         
     array_notes = add_objects(array_notes, array_validobjects)
     write_midi(instrument, [array_notes, array_events], end_part, start_part)
+
+def reduce_by_pattern(instrument, level):
+
+    def shift_to_zero(note_array):
+        shifted_array = []
+        start_position = note_array[0][1]
+        measure_offset = mbt(int(note_array[0][1]))[3] # [3], ticks relative to start of measure
+        for note in note_array:
+            offset_note = note[:] # Copy to not affect the old data
+            offset_note[1] = note[1] - start_position + measure_offset # Setting absolute location of offset
+            shifted_array.append(offset_note)
+        return shifted_array
+
+    def get_valid_notes_in_diff_range(i, notes, notes_dict, leveltxt, num_of_measures):
+        array_valid = []
+
+        current_measure = mbt(int(notes[i][1]))[0]
+        stop_measure = current_measure + num_of_measures
+        while current_measure < stop_measure:
+            if i >= len(notes):
+                break
+
+            note = notes[i]
+
+            diff = notes_dict[note[2]][1]
+            if diff == leveltxt:
+                array_valid.append(note)
+            current_measure = mbt(int(note[1]))[0]
+            i = i + 1
+
+        return array_valid
+
+    def notes_equal_to_reference(zeroed_notes_array, ref_x_notes):
+        if len(zeroed_notes_array) != len(ref_x_notes):
+            return False
+
+        # The reference notes are set to selected and the checked notes are not
+        # So have to compare values while ignoring the selected status
+        for i in range(0, len(zeroed_notes_array)):
+            if zeroed_notes_array[i][1:] != ref_x_notes[i][1:]:
+                return False
+
+        return True
+
+    def compare_measures(i, notes, notes_dict, ref_x_notes, num_of_measures):
+        array_valid = get_valid_notes_in_diff_range(i, notes, notes_dict, "notes_x", num_of_measures)
+
+        if len(array_valid) == 0:
+            return False
+
+        valid_notes_zeroed = shift_to_zero(array_valid)
+
+        return notes_equal_to_reference(valid_notes_zeroed, ref_x_notes)
+
+    instrument = tracks_array[instrument]
+    array_instrument_data = process_instrument(instrument)
+    array_instrument_notes = array_instrument_data[1]
+    end_part = array_instrument_data[2]
+    start_part = array_instrument_data[3]
+    array_notesevents = create_notes_array(array_instrument_notes)
+    array_notes = array_notesevents[0]
+    array_events = array_notesevents[1]
+    
+    instrumentname = ''
+
+    for instrument_name, instrument_id in list(tracks_array.items()):
+        if instrument_id == instrument:
+            instrumentname = instrument_name
+    leveltext = "notes_"+level
+    notes_dict = notesname_array[notesname_instruments_array[instrumentname]]
+
+    # This requires there to be selected measures, 
+    # so function will exit if nothing is selected.
+    notes_range = selected_range(array_notes)
+    PM("Notes range:\n" + str(notes_range) + "\n")
+    if notes_range[0] == "unset":
+        RPR_MB("No selected range found in the specified instrument. Please select a range of notes to reduce from.", "No selection", 0)
+        return
+
+    first_measure = mbt(int(selected_range(array_notes)[0]))[0]
+    last_measure = mbt(int(selected_range(array_notes)[1]))[0]
+    diff_measures = last_measure - first_measure + 1
+
+    array_x_range_absolute_pos = []
+    array_reduced_range_absolute_pos = []
+
+    # Collect the expert notes that will be compared
+    # and the lower diff notes to base the reductions from.
+    for note in array_notes:
+        if note[2] not in notes_dict:
+            invalid_note_mb(note, instrumentname)
+            return
+        this_measure = mbt(int(note[1]))[0]
+        if this_measure >= first_measure and this_measure <= last_measure:
+            diff = notes_dict[note[2]][1]
+            if diff == leveltext:
+                array_reduced_range_absolute_pos.append(note)
+            elif diff == "notes_x":
+                array_x_range_absolute_pos.append(note)
+
+    selected_measures = []
+    for note in array_x_range_absolute_pos:
+        selected_measures.append(mbt(note[1])[0])
+
+    selected_measures = set(selected_measures)
+    min_measure = mbt(int(array_notes[0][1]))[0]
+
+    PM("selected_measures: " + str(selected_measures) + "\n")
+
+    # For searching purposes, there is no point in searching if the
+    # number of remaining measures is smaller than the measures to compare with
+    max_measure = mbt(int(array_notes[-1][1]))[0] - (last_measure - first_measure - 1)
+
+    # Set the absolute positions starting from zero 
+    # so they can be used with offsets later.
+    array_x_range = shift_to_zero(array_x_range_absolute_pos)
+    array_reduced_range = shift_to_zero(array_reduced_range_absolute_pos)
+
+    PM("Expert array:\n" + "\n".join([str(x) for x in array_x_range_absolute_pos]) + "\n\n")
+    PM("Reduced array:\n" + "\n".join([str(x) for x in array_reduced_range_absolute_pos]) + "\n\n")
+
+    PM("Expert zeroed array:\n" + "\n".join([str(x) for x in array_x_range]) + "\n\n")
+    PM("Reduced zeroed array:\n" + "\n".join([str(x) for x in array_reduced_range]) + "\n\n")
+
+    # Convert to objects so chords are one element
+    array_x_objects = note_objects(array_x_range)
+    array_reduced_objects = note_objects(array_reduced_range)
+
+    PM("Expert zeroed object array:\n" + "\n".join([str(x) for x in array_x_objects]) + "\n\n")
+    PM("Reduced zeroed object array:\n" + "\n".join([str(x) for x in array_reduced_objects]) + "\n\n")
+
+    # Will check measure by measure to find a match
+    # When a match is found, existing notes will be added to a
+    # deletion queue and the pattern will be added to an addition
+    # queue.
+    array_todelete = []
+    array_toadd = []
+
+    modified = 0
+    measures_changed = []
+
+    prev_measure = min_measure - 1
+    for i in range(0, len(array_notes)):
+        note = array_notes[i]
+
+        this_measure = mbt(int(note[1]))[0]
+        if this_measure > max_measure:
+            break
+
+        if this_measure in selected_measures:
+            continue
+
+        if this_measure != prev_measure:
+            match = compare_measures(i, array_notes, notes_dict, array_x_range, diff_measures)
+
+            if match:
+                PM("Matched measure: " + str(mbt(int(note[1]))[0]) + "\n")
+                range_todelete = get_valid_notes_in_diff_range(i, array_notes, notes_dict, leveltext, diff_measures)
+                array_todelete += range_todelete
+
+                offset = note[1]
+                for reduced_note in array_reduced_range:
+                    offset_note = reduced_note[:]
+                    offset_note[1] = reduced_note[1] + offset
+                    array_toadd.append(offset_note)
+
+                modified = modified + 1
+                measures_changed.append(this_measure)
+
+            prev_measure = this_measure
+
+    output_message = "Replaced {} matched patterns.".format(modified)
+
+    if modified > 0:
+        for i in range(0, len(array_todelete)):
+            array_notes.remove(array_todelete[i])
+
+        array_notes = add_objects(array_notes, note_objects(array_toadd))
+        write_midi(instrument, [array_notes, array_events], end_part, start_part)
+
+        output_message = "{}\nAt measures: {}".format(output_message, ", ".join([str(measure) for measure in measures_changed]))
+
+    RPR_MB(output_message, "Completed", 0)
 
 def edit_by_mbt(instrument, level, measure, beat, tick, notes, selected):
     #Measure, beat and tick: 0 for any, a number for specific measure or specific beat
@@ -2986,7 +3552,7 @@ def edit_by_mbt(instrument, level, measure, beat, tick, notes, selected):
     array_validnotes = [] #The final array going in the array of notes and events
     array_notes = []
     
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     if "REAL_KEYS" in instrumentname or "KEYS_ANIM" in instrumentname:
@@ -3055,7 +3621,7 @@ def copy_od_solo():
     
     instrumentname = ''
     
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes"
@@ -3087,7 +3653,7 @@ def copy_od_solo():
         
         instrumentname = ''
         
-        for instrument_name, instrument_id in tracks_array.iteritems():
+        for instrument_name, instrument_id in list(tracks_array.items()):
             if instrument_id == instrument_b:
                 instrumentname = instrument_name
                 
@@ -3123,7 +3689,7 @@ def add_slides(instrument, selected):
     array_validnotes = [] #The final array going in the array of notes and events
     array_notes = []
     
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes"
@@ -3173,7 +3739,7 @@ def tubes_space(instrument, selected):
     instrumentname = ''
     old_note = []
     leveltext = "phrase"
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
 
@@ -3241,7 +3807,10 @@ def remove_invalid_chars(instrument, selected):
     for x in range(0, len(array_validevents)):
         event = array_validevents[x]
         if event[5] == 'ff05':
-            event[3] = event[3].translate(None, invalid_chars)
+            for char in invalid_chars:
+                if char in event[3]:
+                    event[3] = event[3].replace(char, "")
+
     array_validevents.extend(array_events)
     
     write_midi(instrument, [array_notesevents[0], array_validevents], end_part, start_part)
@@ -3264,7 +3833,7 @@ def capitalize_first(instrument, selected):
     instrumentname = ''
     old_note = []
     leveltext = "phrase"
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
 
@@ -3324,7 +3893,7 @@ def check_capitalization(instrument, selected):
     instrumentname = ''
     old_note = []
     leveltext = "phrase"
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
 
@@ -3430,7 +3999,7 @@ def export_lyrics(instrument, phrasing):
     instrumentname = ''
     old_note = []
     leveltext = "phrase"
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
 
@@ -3490,7 +4059,7 @@ def unpitch(instrument, character, selected):
     array_validnotes = [] #The final array going in the array of notes and events
     array_notes = []
     
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes"
@@ -3505,7 +4074,7 @@ def unpitch(instrument, character, selected):
                 event = array_events[j]
                 if event[1] == position and event[5] == 'ff05' and '#' not in event[3] and '^' not in event[3]:
                     if "$" in event[3]:
-                        event[3] = event[3].translate(None, "$")
+                        event[3] = event[3].replace("$", "")
                         event[3]+=character+"$"
                     else:
                         event[3]+=character
@@ -3528,7 +4097,7 @@ def pitch(instrument, selected):
     array_validnotes = [] #The final array going in the array of notes and events
     array_notes = []
     
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes"
@@ -3542,8 +4111,8 @@ def pitch(instrument, selected):
             for j in range(0, len(array_events)):
                 event = array_events[j]
                 if event[1] == position and event[5] == 'ff05' and ('#' in event[3] or '^' in event[3]):
-                    event[3] = event[3].translate(None, "#")
-                    event[3] = event[3].translate(None, "^")
+                    event[3] = event[3].replace("#", "")
+                    event[3] = event[3].replace("^", "")
                     break
                 
     write_midi(instrument, [array_notesevents[0], array_notesevents[1]], end_part, start_part)
@@ -3563,7 +4132,7 @@ def hide_lyrics(instrument, selected):
     array_validnotes = [] #The final array going in the array of notes and events
     array_notes = []
     
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes"
@@ -3578,6 +4147,40 @@ def hide_lyrics(instrument, selected):
                 event = array_events[j]
                 if event[1] == position and event[5] == 'ff05' and '$' not in event[3]:
                     event[3]+='$'
+                    break
+                
+    write_midi(instrument, [array_notesevents[0], array_notesevents[1]], end_part, start_part)
+
+def show_lyrics(instrument, selected):
+    global maxlen
+    instrument = tracks_array[instrument]
+    array_instrument_data = process_instrument(instrument)
+    array_instrument_notes = array_instrument_data[1]
+    end_part = array_instrument_data[2]
+    start_part = array_instrument_data[3]
+    array_notesevents = create_notes_array(array_instrument_notes)
+    array_events = array_notesevents[1]
+    
+    instrumentname = ''
+
+    array_validnotes = [] #The final array going in the array of notes and events
+    array_notes = []
+    
+    for instrument_name, instrument_id in list(tracks_array.items()):
+        if instrument_id == instrument:
+            instrumentname = instrument_name
+    leveltext = "notes"
+    notes_dict = notesname_array[notesname_instruments_array[instrumentname]]
+    
+    for x in range(0,len(array_notesevents[0])):
+        note = array_notesevents[0][x]
+        if note[2] in notes_dict and notes_dict[note[2]][1] == leveltext and (selected == 0 or (selected and note[0] == 'e')):
+            position = note[1]
+            found = 0
+            for j in range(0, len(array_events)):
+                event = array_events[j]
+                if event[1] == position and event[5] == 'ff05' and '$' in event[3]:
+                    event[3] = event[3].replace('$','')
                     break
                 
     write_midi(instrument, [array_notesevents[0], array_notesevents[1]], end_part, start_part)
@@ -3598,7 +4201,7 @@ def create_phrase_markers(instrument, grid, mute):
     array_validnotes = [] #The final array going in the array of notes and events
     array_validevents = []
     
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes"
@@ -3650,12 +4253,16 @@ def create_phrase_markers(instrument, grid, mute):
         if phrase_char in event[3] and start == 0: #We need to start a phrase
             #When we have a start marker we proceed looping to find the next one
             start = event[1]
-            event[3] = event[3].translate(None, phrase_char)
+            for char in phrase_char:
+                if char in event[3]:
+                    event[3] = event[3].replace(char, "")
         elif phrase_char in event[3]:
             #Once we do we take that position, we set it as new_next and look for the last note before that marker
             new_start = event[1]
-            event[3] = event[3].translate(None, phrase_char)
-            for j in reversed(range(0, len(array_validnotes))):
+            for char in phrase_char:
+                if char in event[3]:
+                    event[3] = event[3].replace(char, "")
+            for j in reversed(list(range(0, len(array_validnotes)))):
                 note = array_validnotes[j]
                 if note[1] < event[1]:
                     #We take the note position, add its length and 1/64th and set that as end
@@ -3740,7 +4347,7 @@ def trim_phrase_markers(instrument, grid):
     array_notes = []
     array_od = []
     
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "notes"
@@ -3776,7 +4383,7 @@ def trim_phrase_markers(instrument, grid):
             if note[1] >= phrase[1] and note[1] < phrase[1]+phrase[4]:
                 notes_found = 1
                 note_position = mbt(note[1])[3]
-                for k in reversed(range(0, 32)):
+                for k in reversed(list(range(0, 32))):
                     if k*grid < note_position-phrases_space:
                         #Get the first quarter grid before that position
                         new_position = note[1]-(note_position-(k*grid))
@@ -3806,7 +4413,7 @@ def trim_phrase_markers(instrument, grid):
         if position-(grid_check*division) > 0:
             #If it's not, get position of the last note of the phrase
             notes_found = 0
-            for j in reversed(range(0, len(array_validnotes))):
+            for j in reversed(list(range(0, len(array_validnotes)))):
                 note = array_validnotes[j]
                 if note[1] < end_of_phrase and note[1] >= phrase[1]:
                     notes_found = 1
@@ -3879,7 +4486,7 @@ def compact_harmonies(precedence, grid):
     array_lyrics_h2 = []
     array_lyrics_h3 = []
 
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     notes_dict = notesname_array[notesname_instruments_array[instrumentname]]
@@ -4022,7 +4629,7 @@ def add_vocalsoverdrive(instrument, frequency, mute):
 
     array_validnotes = []
     
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     leveltext = "phrase"
@@ -4122,7 +4729,7 @@ def cleanup_phrases(instrument):
     array_notes = []
     array_remove = []
 
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument:
             instrumentname = instrument_name
     notes_dict = notesname_array[notesname_instruments_array[instrumentname]]
@@ -4201,7 +4808,7 @@ def compact_phrases():
         array_notes_h1 = []
         array_notes_h2 = []
 
-        for instrument_name, instrument_id in tracks_array.iteritems():
+        for instrument_name, instrument_id in list(tracks_array.items()):
             if instrument_id == instrument:
                 instrumentname = instrument_name
         notes_dict = notesname_array[notesname_instruments_array[instrumentname]]
@@ -4303,6 +4910,106 @@ def compact_phrases():
     else:
         return 'no h1 or h2'
 
+# Concept of function:
+# - Check singing notes
+# - Create new sing-a-long note when new singing note appears
+# - If there is a space of 1 measure (non-inclusive) end the 
+#   sing-a-long note
+# - If it is the last singing note end the sing-a-long
+# - Repeat until all the singing notes in the track are checked
+def create_singalong(instrument):
+    if instrument not in array_dropdownvocals: 
+        return
+
+    # The length of empty space (non-inclusive) between notes
+    # to warrant making a new sing-a-long note.
+    threshhold = 4 * correct_tqn
+
+    if instrument == "HARM1":
+        singalong_pitch = 86 # drummer singalong
+        singalong_name = "Drummer Sing Along"
+    elif instrument == "HARM2":
+        singalong_pitch = 87 # guitarist singalong
+        singalong_name = "Guitarist Sing Along"
+    elif instrument == "HARM3":
+        singalong_pitch = 85 # bassist singalong
+        singalong_name = "Bassist Sing Along"
+
+    if instrument == '':
+        instrument = get_trackid()
+    else:
+        instrument = tracks_array[instrument]
+    #PM("\n\ninstrument: "+instrument)
+    array_instrument_data = process_instrument(instrument)
+    array_instrument_notes = array_instrument_data[1]
+    end_part = array_instrument_data[2]
+    start_part = array_instrument_data[3]
+    array_notesevents = create_notes_array(array_instrument_notes)
+
+    for instrument_name, instrument_id in list(tracks_array.items()):
+        if instrument_id == instrument:
+            instrumentname = instrument_name
+    notes_dict = notesname_array[notesname_instruments_array[instrumentname]]
+
+    array_validnotes = []
+
+    for x in range(0,len(array_notesevents[0])):
+        note = array_notesevents[0][x]
+        if note[2] not in notes_dict:
+            invalid_note_mb(note, instrument)
+            return
+        if notes_dict[note[2]][1] == "notes":
+            array_validnotes.append(note)
+
+    # The main part of the algorithm described above is here
+    # array_singalong has [start_position, end_position] elements
+    note_on = False
+    array_singalong = []
+    for i in range(0,len(array_validnotes)):
+        note = array_validnotes[i]
+
+        if note_on is False:
+            array_singalong.append([note[1]-correct_tqn])
+            note_on = True
+
+        if (i+1) == len(array_validnotes):
+            array_singalong[-1].append(note[1]+note[4])
+            note_on = False
+        elif array_validnotes[i+1][1] > (note[1] + note[4] + threshhold):
+            array_singalong[-1].append(note[1]+note[4]+correct_tqn)
+            note_on = False
+           
+    # The elements in array_singalong are converted to proper note objects.
+    array_newnotes = []
+    for note in array_singalong:
+        array_newnotes.append(["E", note[0], singalong_pitch, '7f', note[1] - note[0], '90'])
+
+    venue = tracks_array["VENUE"]
+    array_venue_data = process_instrument(venue)
+    array_venue_notes = array_venue_data[1]
+    venue_end_part = array_venue_data[2]
+    venue_start_part = array_venue_data[3]
+    array_notesevents_venue = create_notes_array(array_venue_notes)
+
+    # Checking for pre-existing sing-a-long notes in the VENUE track.
+    overwrite = False
+    array_venuenotes = []
+    for x in range(0,len(array_notesevents_venue[0])):
+        note = array_notesevents_venue[0][x]
+        if overwrite is False and note[2] == singalong_pitch:
+            result = RPR_MB("Found \"%s\" notes in VENUE. Do you wish to overwrite them?" % singalong_name,
+                    "Create sing-a-long", 3)
+            if result == 6:
+                overwrite = True
+            else:
+                return
+        else:
+            if note[2] != singalong_pitch:
+                array_venuenotes.append(note)
+
+    array_notescombined = array_venuenotes + array_newnotes
+
+    write_midi(venue, [array_notescombined, array_notesevents_venue[1]], venue_end_part, venue_start_part)
 
 def create_keys_animations():
     global maxlen
@@ -4321,7 +5028,7 @@ def create_keys_animations():
     start_part = array_instrument_data[3]
     array_notesevents = create_notes_array(array_instrument_notes)
 
-    for instrument_name, instrument_id in tracks_array.iteritems():
+    for instrument_name, instrument_id in list(tracks_array.items()):
         if instrument_id == instrument_keys:
             instrumentname = instrument_name
     notes_dict = notesname_array[notesname_instruments_array[instrumentname]]
@@ -5134,19 +5841,30 @@ def startup():
         config[k.strip()] = v.strip()
     f.close()
     
+    PM("Config read")
+    PM("\n")
+
     try:
         prep_tracks()
     except UnicodeDecodeError:
-        RPR_MB("Invalid file name found in one of your tracks. "\
-                "Make sure there are no items with special characters in your project. \n\n"\
-                "The culprit is usually the song file itself. Look for accents and symbols. " \
-                "You can rename an item in Item Properties (F2).", 
+
+        RPR_MB("Unicode Error caught."\
+                "\n\nPlease screenshot this error and report it. \n\n"
+                +str(traceback.format_exc()), 
                 "Unicode Error", 0)
         raise
+
+    PM("Tracks Prepped")
+    PM("\n")
+
     #We start off getting the end event and the instrument ticks
     array_instrument_data = process_instrument(tracks_array["EVENTS"]) #This toggles the processing of the EVENTS chunk that sets end_event
+    PM("process_instrument")
+    PM("\n")
     instrument_ticks = array_instrument_data[0] #Number of ticks per measure of the instrument
     measures_array = get_time_signatures(instrument_ticks) #Let's create the array with all measures with BPM, ticks and time signatures 
+    PM("get_time_signatures")
+    PM("\n")
     if isinstance(measures_array, list) == False:
         result = RPR_MB( "No time markers found, aborting", "Invalid tempo map", 0)
         return

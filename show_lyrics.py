@@ -20,9 +20,10 @@ def execute(sel):
     global expression_var
     global form
     instrument = str(instrument_var.get())
+
     instrument = C3toolbox.array_instruments[instrument]
     C3toolbox.startup()
-    C3toolbox.pitch(instrument, sel) #instrument, level, option, selected
+    C3toolbox.show_lyrics(instrument, sel) #instrument, level, option, selected
     form.destroy()
 
 def launch():
@@ -32,7 +33,7 @@ def launch():
     
     form = tkinter.Tk()
     getFld = tkinter.IntVar()
-    form.wm_title('Pitch lyrics')
+    form.wm_title('Show lyrics')
     C3toolbox.startup()
     instrument_name = C3toolbox.get_trackname()
     if instrument_name in C3toolbox.array_dropdownvocals:
@@ -52,10 +53,10 @@ def launch():
     instrumentOpt = tkinter.OptionMenu(*(helpLf, instrument_var) + tuple(OPTIONS))
     instrumentOpt.grid(row=0, column=1, columnspan=1, sticky="WE", pady=3)
 
-    allBtn = tkinter.Button(helpLf, text="Fix all notes", command= lambda: execute(0)) 
+    allBtn = tkinter.Button(helpLf, text="Show all notes", command= lambda: execute(0)) 
     allBtn.grid(row=0, column=3, rowspan=1, sticky="WE", padx=5, pady=2)
 
-    selBtn = tkinter.Button(helpLf, text="Fix selected notes only", command= lambda: execute(1)) 
+    selBtn = tkinter.Button(helpLf, text="Show selected notes only", command= lambda: execute(1)) 
     selBtn.grid(row=0, column=4, rowspan=1, sticky="WE", padx=5, pady=2)    
     
     logo = tkinter.Frame(form, bg="#000")
@@ -72,4 +73,5 @@ def launch():
 if __name__ == '__main__':
     launch()
     #C3toolbox.startup()
-    #C3toolbox.pitch('PART VOCALS', 0) 
+    #C3toolbox.show_lyrics('PART VOCALS', 0) #Do not set SELECTED to 1, it won't work
+
